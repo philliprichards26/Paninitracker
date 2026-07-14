@@ -223,13 +223,13 @@
   }
   .scan-guide{
     position:absolute; left:50%; top:42%; transform:translate(-50%,-50%);
-    width:72%; max-width:420px; aspect-ratio:4/1;
+    width:46%; max-width:240px; aspect-ratio:3/1;
     border:2.5px solid var(--gold-hi); border-radius:10px;
     box-shadow:0 0 0 2000px rgba(0,0,0,.45);
     pointer-events:none;
   }
   .scan-guide::after{
-    content:"Line the code up in here (e.g. URU 10)";
+    content:"Just the code in here (e.g. URU 10)";
     position:absolute; top:-30px; left:50%; transform:translateX(-50%);
     white-space:nowrap; color:#fff; font-size:13px; font-weight:600;
     text-shadow:0 1px 3px rgba(0,0,0,.8);
@@ -310,7 +310,7 @@
 
   <div id="missingPanel" style="display:none;"></div>
 
-  <footer>980 stickers · 48 teams · stored only on this device · <b style="color:var(--gold-hi);">app v5</b></footer>
+  <footer>980 stickers · 48 teams · stored only on this device · <b style="color:var(--gold-hi);">app v6</b></footer>
 </div>
 
 <script>
@@ -627,8 +627,8 @@ function grabGuideRegion(){
   const scale = Math.max(dispW/vw, dispH/vh);
   const visW = dispW/scale, visH = dispH/scale;      // visible source region
   const offX = (vw - visW)/2, offY = (vh - visH)/2;
-  const gW = Math.min(0.72*dispW, 420)/scale;
-  const gH = gW/4;
+  const gW = Math.min(0.46*dispW, 240)/scale;
+  const gH = gW/3;
   const gX = offX + (visW - gW)/2;
   const gY = offY + visH*0.42 - gH/2;
 
