@@ -8,24 +8,36 @@
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
   :root{
-    --pitch-1:#0a2e1e;
-    --pitch-2:#123f27;
-    --paper:#f6f1e3;
-    --paper-dim:#ece4d0;
-    --ink:#152018;
-    --ink-soft:#4a5a4e;
+    --royal:#2437a8;        /* deep cover blue   */
+    --royal-2:#3a53d4;
+    --sky:#7fb3e8;
+    --cup-red:#e8412e;      /* cover red-orange  */
+    --cup-orange:#f4802a;
+    --lime:#a8c93a;
+    --grass:#2e8b4f;
+    --violet:#7a5fc0;
+    --paper:#fdfaf2;        /* card cream        */
+    --paper-dim:#f1ebdc;
+    --ink:#1c2340;
+    --ink-soft:#5a6180;
     --gold:#d4af37;
     --gold-hi:#f0d777;
-    --red:#c8102e;
-    --line:#d9cfb4;
+    --red:#e8412e;
+    --line:#e2dac6;
     --radius:14px;
   }
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
   html,body{margin:0;padding:0;}
   body{
     background:
-      repeating-linear-gradient(115deg, rgba(255,255,255,0.025) 0 40px, rgba(0,0,0,0.02) 40px 80px),
-      linear-gradient(160deg, var(--pitch-1), var(--pitch-2) 60%, #0a2e1e 100%);
+      radial-gradient(circle at 0% 0%, var(--lime) 0 90px, transparent 90px),
+      radial-gradient(circle at 100% 4%, var(--cup-orange) 0 110px, transparent 110px),
+      radial-gradient(circle at 0% 32%, var(--violet) 0 100px, transparent 100px),
+      radial-gradient(circle at 100% 42%, var(--grass) 0 95px, transparent 95px),
+      radial-gradient(circle at 0% 68%, var(--cup-red) 0 105px, transparent 105px),
+      radial-gradient(circle at 100% 80%, var(--sky) 0 100px, transparent 100px),
+      radial-gradient(circle at 0% 100%, var(--cup-orange) 0 90px, transparent 90px),
+      linear-gradient(170deg, var(--royal) 0%, var(--royal-2) 55%, #1d2c86 100%);
     min-height:100vh;
     font-family:'Inter',sans-serif;
     color:var(--ink);
@@ -76,14 +88,14 @@
   .scan-row{display:flex; align-items:center; gap:14px;}
   .scan-btn{
     flex:1; display:flex; align-items:center; justify-content:center; gap:10px;
-    background:linear-gradient(180deg, var(--red), #9c0c22);
+    background:linear-gradient(180deg, var(--red), #c22f1d);
     color:#fff; border:none; border-radius:11px; padding:15px 16px;
     font-family:'Inter'; font-weight:800; font-size:15.5px; letter-spacing:.02em;
-    box-shadow:0 6px 0 #6f0817, 0 10px 18px rgba(200,16,46,.35);
+    box-shadow:0 6px 0 #93200f, 0 10px 18px rgba(232,65,46,.35);
     cursor:pointer; -webkit-user-select:none; user-select:none;
     transition:transform .08s ease;
   }
-  .scan-btn:active{transform:translateY(4px); box-shadow:0 2px 0 #6f0817;}
+  .scan-btn:active{transform:translateY(4px); box-shadow:0 2px 0 #93200f;}
   .scan-btn svg{width:20px; height:20px;}
   #cameraInput{display:none;}
   .scan-sub{
@@ -204,14 +216,14 @@
   /* ---------- Scanner overlay ---------- */
   .scan-btn{
     width:100%; display:flex; align-items:center; justify-content:center; gap:10px;
-    background:linear-gradient(180deg, var(--red), #9c0c22);
+    background:linear-gradient(180deg, var(--red), #c22f1d);
     color:#fff; border:none; border-radius:11px; padding:15px 16px;
     font-family:'Inter'; font-weight:800; font-size:15.5px; letter-spacing:.02em;
-    box-shadow:0 6px 0 #6f0817, 0 10px 18px rgba(200,16,46,.35);
+    box-shadow:0 6px 0 #93200f, 0 10px 18px rgba(232,65,46,.35);
     cursor:pointer; -webkit-user-select:none; user-select:none;
     transition:transform .08s ease; margin-bottom:12px;
   }
-  .scan-btn:active{transform:translateY(4px); box-shadow:0 2px 0 #6f0817;}
+  .scan-btn:active{transform:translateY(4px); box-shadow:0 2px 0 #93200f;}
   .scan-btn svg{width:20px; height:20px;}
   .scanner{
     display:none; position:fixed; inset:0; background:#000; z-index:100;
@@ -337,7 +349,7 @@
 
   <div id="missingPanel" style="display:none;"></div>
 
-  <footer>980 stickers · 48 teams · stored only on this device · <b style="color:var(--gold-hi);">app v10</b></footer>
+  <footer>980 stickers · 48 teams · stored only on this device · <b style="color:var(--gold-hi);">app v11</b><br><button id="resetBtn" style="margin-top:8px;background:none;border:none;color:rgba(255,255,255,.5);font-size:11px;text-decoration:underline;cursor:pointer;font-family:'Inter';">reset album to zero</button></footer>
 </div>
 
 <script>
@@ -864,6 +876,16 @@ function matchOcrText(text){
   return null;
 }
 
+
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  const n = owned.size;
+  if(!n){ alert('Album is already empty.'); return; }
+  if(!confirm(`Remove all ${n} stickers from the album? This cannot be undone.`)) return;
+  if(!confirm('Really sure? Everything goes back to zero.')) return;
+  owned.clear();
+  saveOwned();
+  render(document.getElementById('searchInput').value);
+});
 
 loadOwned();
 </script>
