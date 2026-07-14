@@ -223,7 +223,7 @@
   }
   .scan-guide{
     position:absolute; left:50%; top:42%; transform:translate(-50%,-50%);
-    width:46%; max-width:240px; aspect-ratio:3/1;
+    width:34%; max-width:180px; aspect-ratio:3/1;
     border:2.5px solid var(--gold-hi); border-radius:10px;
     box-shadow:0 0 0 2000px rgba(0,0,0,.45);
     pointer-events:none;
@@ -253,6 +253,27 @@
     position:absolute; left:50%; top:58%; transform:translateX(-50%);
     color:#fff; font-size:14px; font-weight:600; text-shadow:0 1px 3px rgba(0,0,0,.8);
     text-align:center; width:90%;
+  }
+  .confirm-tick{
+    display:none; position:absolute; left:50%; top:66%; transform:translateX(-50%);
+    padding:13px 26px; border-radius:12px; border:none;
+    background:var(--gold); color:#26200a; font-family:'Inter'; font-weight:800; font-size:16px;
+    box-shadow:0 4px 12px rgba(0,0,0,.4); cursor:pointer;
+  }
+  .confirm-tick.show{display:block;}
+  .recent-strip{
+    position:absolute; bottom:96px; left:0; right:0; padding:0 14px;
+    display:flex; gap:8px; overflow-x:auto; -webkit-overflow-scrolling:touch;
+  }
+  .recent-chip{
+    flex-shrink:0; display:flex; align-items:center; gap:8px;
+    background:rgba(246,241,227,.95); border-radius:9px; padding:8px 8px 8px 12px;
+    font-family:'Space Mono',monospace; font-weight:700; font-size:13px; color:var(--ink);
+  }
+  .recent-chip .undo{
+    border:none; background:var(--red); color:#fff; border-radius:6px;
+    width:26px; height:26px; font-size:15px; font-weight:800; cursor:pointer;
+    display:flex; align-items:center; justify-content:center; font-family:'Inter';
   }
 </style>
 </head>
@@ -290,6 +311,8 @@
     <video id="scanVideo" autoplay playsinline muted></video>
     <div class="scan-guide"></div>
     <div class="scanner-msg" id="scannerMsg"></div>
+    <button class="confirm-tick" id="confirmTickBtn"></button>
+    <div class="recent-strip" id="recentStrip"></div>
     <div class="scanner-controls">
       <button class="close-scan-btn" id="closeScanBtn" style="flex:1;">Done scanning</button>
     </div>
@@ -309,7 +332,7 @@
 
   <div id="missingPanel" style="display:none;"></div>
 
-  <footer>980 stickers · 48 teams · stored only on this device · <b style="color:var(--gold-hi);">app v8</b></footer>
+  <footer>980 stickers · 48 teams · stored only on this device · <b style="color:var(--gold-hi);">app v9</b></footer>
 </div>
 
 <script>
@@ -646,9 +669,11 @@ async function scanLoop(){
         // clean read -> accept straight away; fuzzy read -> needs a second agreeing read
         acceptScan(code);
         lastAccepted = code; lastAcceptedAt = now; lastRead = null;
+        hideConfirmTick();
       }else{
         lastRead = code;
-        scannerMsg.textContent = `Seeing ${code} — hold still to confirm…`;
+        scannerMsg.textContent = `Seeing ${code} — hold still, or confirm:`;
+        showConfirmTick(code);
       }
     }
     // note: a failed read no longer resets lastRead, so a fuzzy read can be
@@ -666,6 +691,7 @@ function acceptScan(code){
     owned.add(code);
     saveOwned();
     render(document.getElementById('searchInput').value);
+    addRecentChip(code);
   }
   if(navigator.vibrate) navigator.vibrate(already ? [60,60,60] : 120);
   scannerMsg.textContent = already
@@ -673,10 +699,48 @@ function acceptScan(code){
     : `✓ ${code} — ${info.group.name}, ${info.sticker.label}. Next sticker…`;
 }
 
+/* --- confirm tick: accept a fuzzy read with one tap instead of waiting --- */
+const confirmTickBtn = document.getElementById('confirmTickBtn');
+let pendingCode = null;
+function showConfirmTick(code){
+  pendingCode = code;
+  confirmTickBtn.textContent = `✓ Yes, it's ${code}`;
+  confirmTickBtn.classList.add('show');
+}
+function hideConfirmTick(){
+  pendingCode = null;
+  confirmTickBtn.classList.remove('show');
+}
+confirmTickBtn.addEventListener('click', ()=>{
+  if(!pendingCode) return;
+  acceptScan(pendingCode);
+  lastAccepted = pendingCode; lastAcceptedAt = Date.now(); lastRead = null;
+  hideConfirmTick();
+});
+
+/* --- recent scans strip: undo a wrong scan with one tap --- */
+const recentStrip = document.getElementById('recentStrip');
+function addRecentChip(code){
+  const chip = document.createElement('div');
+  chip.className = 'recent-chip';
+  chip.innerHTML = `<span>${code}</span><button class="undo" title="Remove">✕</button>`;
+  chip.querySelector('.undo').addEventListener('click', ()=>{
+    owned.delete(code);
+    saveOwned();
+    render(document.getElementById('searchInput').value);
+    chip.remove();
+    if(navigator.vibrate) navigator.vibrate(40);
+  });
+  recentStrip.prepend(chip);
+  while(recentStrip.children.length > 6) recentStrip.lastChild.remove();
+}
+
 function stopScanLoop(){ scanning = false; }
 
 function closeScanner(){
   stopScanLoop();
+  hideConfirmTick();
+  recentStrip.innerHTML = '';
   scanner.classList.remove('show');
   if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream = null; }
   scanVideo.srcObject = null;
@@ -692,7 +756,7 @@ function grabGuideRegion(binarize){
   const scale = Math.max(dispW/vw, dispH/vh);
   const visW = dispW/scale, visH = dispH/scale;      // visible source region
   const offX = (vw - visW)/2, offY = (vh - visH)/2;
-  const gW = Math.min(0.46*dispW, 240)/scale;
+  const gW = Math.min(0.34*dispW, 180)/scale;
   const gH = gW/3;
   const gX = offX + (visW - gW)/2;
   const gY = offY + visH*0.42 - gH/2;
