@@ -309,7 +309,7 @@
 
   <div id="missingPanel" style="display:none;"></div>
 
-  <footer>980 stickers · 48 teams · stored only on this device · <b style="color:var(--gold-hi);">app v7</b></footer>
+  <footer>980 stickers · 48 teams · stored only on this device · <b style="color:var(--gold-hi);">app v8</b></footer>
 </div>
 
 <script>
@@ -630,29 +630,30 @@ async function scanLoop(){
     if(!scanVideo.videoWidth){ await sleep(200); continue; }
     const canvas = grabGuideRegion(passCount % 2 === 1); // alternate preprocessing
     passCount++;
-    let code = null;
+    let hit = null;
     try{
       const {data} = await ocrWorker.recognize(canvas);
-      code = matchOcrText(data.text);
+      hit = matchOcrText(data.text);
     }catch(e){ /* keep looping */ }
     if(!scanning) break;
 
-    if(code){
+    if(hit){
+      const {code, exact} = hit;
       const now = Date.now();
       if(code === lastAccepted && now - lastAcceptedAt < 4000){
         // same sticker still in front of the camera — ignore
-      }else if(code === lastRead){
-        // seen twice in a row -> accept
+      }else if(exact || code === lastRead){
+        // clean read -> accept straight away; fuzzy read -> needs a second agreeing read
         acceptScan(code);
         lastAccepted = code; lastAcceptedAt = now; lastRead = null;
       }else{
         lastRead = code;
         scannerMsg.textContent = `Seeing ${code} — hold still to confirm…`;
       }
-    }else{
-      lastRead = null;
     }
-    await sleep(150);
+    // note: a failed read no longer resets lastRead, so a fuzzy read can be
+    // confirmed by any later read of the same code, not only the very next one
+    await sleep(60);
   }
 }
 
@@ -696,9 +697,9 @@ function grabGuideRegion(binarize){
   const gX = offX + (visW - gW)/2;
   const gY = offY + visH*0.42 - gH/2;
 
-  // Crop, upscale 3x, grayscale; alternate passes apply hard binarization,
+  // Crop, upscale 2x, grayscale; alternate passes apply hard binarization,
   // which handles glossy/low-contrast print differently than contrast stretch
-  const outW = Math.round(gW*3), outH = Math.round(gH*3);
+  const outW = Math.round(gW*2), outH = Math.round(gH*2);
   const canvas = document.createElement('canvas');
   canvas.width = outW; canvas.height = outH;
   const ctx = canvas.getContext('2d');
@@ -745,17 +746,16 @@ for(const code of SORTED_CODES){
 function matchOcrText(text){
   const cleaned = (text||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
   if(!cleaned) return null;
-  // 1. exact match on the raw text
-  if(CODE_SET.has(cleaned)) return cleaned;
-  // 2. exact match after look-alike correction (URU1O -> URU10, OAT3 -> QAT3)
+  // exact match on the raw text — high confidence
+  if(CODE_SET.has(cleaned)) return {code:cleaned, exact:true};
   const canonText = canon(cleaned);
-  if(CANON_TO_CODE[canonText]) return CANON_TO_CODE[canonText];
-  // 3. substring search in corrected space only, longest codes first,
-  //    so URU10 is found inside noise before URU1 can steal the match
+  // whole text is one code after look-alike correction — still high confidence
+  if(CANON_TO_CODE[canonText]) return {code:CANON_TO_CODE[canonText], exact:true};
+  // substring in corrected space — lower confidence, needs a confirming read
   const canonKeys = Object.keys(CANON_TO_CODE).sort((a,b)=>b.length-a.length);
   for(const key of canonKeys){
     if(key.length <= 2) continue; // short codes ("00") only match exactly, never by substring
-    if(canonText.includes(key)) return CANON_TO_CODE[key];
+    if(canonText.includes(key)) return {code:CANON_TO_CODE[key], exact:false};
   }
   return null;
 }
