@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Album Tracker — FIFA World Cup 2026</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --pitch-1:#0a2e1e;
+    --pitch-2:#123f27;
+    --paper:#f6f1e3;
+    --paper-dim:#ece4d0;
+    --ink:#152018;
+    --ink-soft:#4a5a4e;
+    --gold:#d4af37;
+    --gold-hi:#f0d777;
+    --red:#c8102e;
+    --line:#d9cfb4;
+    --radius:14px;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      repeating-linear-gradient(115deg, rgba(255,255,255,0.025) 0 40px, rgba(0,0,0,0.02) 40px 80px),
+      linear-gradient(160deg, var(--pitch-1), var(--pitch-2) 60%, #0a2e1e 100%);
+    min-height:100vh;
+    font-family:'Inter',sans-serif;
+    color:var(--ink);
+    padding-bottom:40px;
+  }
+  .wrap{max-width:640px;margin:0 auto;padding:18px 14px 10px;}
+
+  /* ---------- Header ---------- */
+  header{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:6px 4px 18px;
+  }
+  .brand{display:flex; flex-direction:column; line-height:1;}
+  .brand .kicker{
+    font-family:'Space Mono',monospace; font-size:11px; letter-spacing:.18em;
+    color:var(--gold-hi); text-transform:uppercase; margin-bottom:4px;
+  }
+  .brand h1{
+    font-family:'Anton',sans-serif; font-weight:400; font-size:30px; color:#fff;
+    letter-spacing:.5px; margin:0; text-shadow:0 2px 0 rgba(0,0,0,.25);
+  }
+  .brand h1 span{color:var(--gold-hi);}
+  .ring{position:relative; width:58px; height:58px; flex-shrink:0;}
+  .ring svg{transform:rotate(-90deg); width:58px; height:58px;}
+  .ring circle{fill:none; stroke-width:6;}
+  .ring .track{stroke:rgba(255,255,255,.15);}
+  .ring .prog{stroke:var(--gold); stroke-linecap:round; transition:stroke-dashoffset .5s ease;}
+  .ring .num{
+    position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-family:'Space Mono',monospace; font-weight:700; font-size:12px; color:#fff;
+  }
+
+  /* ---------- Scan card ---------- */
+  .scan-card{
+    background:var(--paper);
+    border-radius:var(--radius);
+    padding:18px;
+    box-shadow:0 10px 30px rgba(0,0,0,.35);
+    border:1px solid rgba(0,0,0,.06);
+    margin-bottom:14px;
+    position:relative;
+    overflow:hidden;
+  }
+  .scan-card::before{
+    content:"26"; position:absolute; right:-6px; top:-18px; font-family:'Anton'; font-size:96px;
+    color:rgba(200,16,46,.06); line-height:1; pointer-events:none;
+  }
+  .scan-row{display:flex; align-items:center; gap:14px;}
+  .scan-btn{
+    flex:1; display:flex; align-items:center; justify-content:center; gap:10px;
+    background:linear-gradient(180deg, var(--red), #9c0c22);
+    color:#fff; border:none; border-radius:11px; padding:15px 16px;
+    font-family:'Inter'; font-weight:800; font-size:15.5px; letter-spacing:.02em;
+    box-shadow:0 6px 0 #6f0817, 0 10px 18px rgba(200,16,46,.35);
+    cursor:pointer; -webkit-user-select:none; user-select:none;
+    transition:transform .08s ease;
+  }
+  .scan-btn:active{transform:translateY(4px); box-shadow:0 2px 0 #6f0817;}
+  .scan-btn svg{width:20px; height:20px;}
+  #cameraInput{display:none;}
+  .scan-sub{
+    font-size:12px; color:var(--ink-soft); margin-top:10px; text-align:center;
+  }
+  .manual-toggle{
+    display:block; width:100%; text-align:center; margin-top:10px; background:none; border:none;
+    color:var(--ink-soft); font-size:12.5px; text-decoration:underline; cursor:pointer; padding:4px;
+    font-family:'Inter';
+  }
+
+  .scan-status{
+    display:none; margin-top:12px; padding:12px 14px; border-radius:10px;
+    font-size:14px; font-weight:600; align-items:center; gap:10px;
+  }
+  .scan-status.show{display:flex;}
+  .scan-status.ok{background:#e5f3e6; color:#1e5c25;}
+  .scan-status.dupe{background:#fff3d6; color:#7a5b06;}
+  .scan-status.fail{background:#fde7e7; color:#8c1f1f;}
+  .scan-status.loading{background:#eee; color:#555;}
+  .spinner{
+    width:16px; height:16px; border-radius:50%; border:2px solid #ccc; border-top-color:#555;
+    animation:spin .7s linear infinite; flex-shrink:0;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  .manual-form{display:none; margin-top:12px; gap:8px;}
+  .manual-form.show{display:flex;}
+  .manual-form input{
+    flex:1; padding:11px 12px; border-radius:9px; border:1px solid var(--line);
+    font-family:'Space Mono',monospace; font-size:14px; text-transform:uppercase;
+  }
+  .manual-form button{
+    padding:11px 16px; border-radius:9px; border:none; background:var(--ink); color:#fff;
+    font-weight:700; cursor:pointer;
+  }
+
+  /* ---------- Tabs ---------- */
+  .tabs{display:flex; gap:6px; margin-bottom:12px;}
+  .tab{
+    flex:1; text-align:center; padding:10px 8px; border-radius:10px; cursor:pointer;
+    font-weight:700; font-size:13.5px; color:rgba(255,255,255,.6);
+    background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1);
+  }
+  .tab.active{background:var(--gold); color:#26200a; border-color:var(--gold);}
+
+  /* ---------- Search ---------- */
+  .search-row{margin-bottom:14px;}
+  .search-row input{
+    width:100%; padding:12px 14px; border-radius:10px; border:none;
+    background:rgba(255,255,255,.92); font-family:'Inter'; font-size:14.5px;
+  }
+
+  /* ---------- Album groups ---------- */
+  .group{margin-bottom:14px; background:var(--paper); border-radius:var(--radius); overflow:hidden; box-shadow:0 6px 18px rgba(0,0,0,.25);}
+  .group-head{
+    display:flex; align-items:center; gap:10px; padding:13px 14px; cursor:pointer;
+    border-bottom:1px solid var(--line);
+  }
+  .group-head .flag{font-size:20px;}
+  .group-head .gname{font-weight:800; font-size:15px; flex:1;}
+  .group-head .gcount{
+    font-family:'Space Mono',monospace; font-size:12px; color:var(--ink-soft); font-weight:700;
+  }
+  .group-bar{height:4px; background:var(--paper-dim);}
+  .group-bar-fill{height:100%; background:linear-gradient(90deg,var(--gold),var(--gold-hi));}
+  .group-head .chev{
+    font-size:11px; color:var(--ink-soft); transition:transform .2s ease;
+  }
+  .group.open .chev{transform:rotate(180deg);}
+  .grid{
+    display:none; grid-template-columns:repeat(5,1fr); gap:8px; padding:14px;
+  }
+  .group.open .grid{display:grid;}
+
+  .sticker{
+    aspect-ratio:1/1.2; border-radius:8px; position:relative; cursor:pointer;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-family:'Space Mono',monospace; font-size:10.5px; font-weight:700; text-align:center;
+    padding:2px; overflow:hidden;
+  }
+  .sticker.missing{
+    border:1.5px dashed #b9ac86; color:#8a8060; background:repeating-linear-gradient(45deg, rgba(0,0,0,0.015) 0 6px, transparent 6px 12px);
+  }
+  .sticker.missing::after{
+    content:""; position:absolute; top:0; right:0; width:0; height:0;
+    border-style:solid; border-width:0 10px 10px 0; border-color:transparent #d9cfb4 transparent transparent;
+  }
+  .sticker.owned{
+    background:linear-gradient(135deg, var(--gold-hi), var(--gold) 55%, #b8902a);
+    color:#2b2308; box-shadow:0 3px 6px rgba(0,0,0,.25), inset 0 1px 1px rgba(255,255,255,.6);
+    transform:rotate(-1.5deg);
+  }
+  .sticker.owned:nth-child(3n){transform:rotate(1.5deg);}
+  .sticker .code{font-size:10.5px;}
+  .sticker .lbl{font-size:7.5px; font-weight:500; opacity:.85; margin-top:2px; line-height:1.1; font-family:'Inter';}
+
+  /* ---------- Missing tab ---------- */
+  .missing-panel{background:var(--paper); border-radius:var(--radius); padding:16px; box-shadow:0 6px 18px rgba(0,0,0,.25);}
+  .missing-panel h2{font-family:'Anton'; font-weight:400; font-size:20px; margin:0 0 4px;}
+  .missing-panel p.sub{margin:0 0 14px; font-size:13px; color:var(--ink-soft);}
+  .copy-btn{
+    width:100%; padding:12px; border-radius:9px; border:none; background:var(--ink); color:#fff;
+    font-weight:700; margin-bottom:16px; cursor:pointer; font-size:14px;
+  }
+  .missing-team{margin-bottom:12px;}
+  .missing-team .mt-head{font-weight:800; font-size:13.5px; margin-bottom:5px; display:flex; gap:6px; align-items:center;}
+  .missing-codes{display:flex; flex-wrap:wrap; gap:6px;}
+  .mchip{
+    background:var(--paper-dim); border:1px solid var(--line); border-radius:6px;
+    padding:4px 8px; font-family:'Space Mono',monospace; font-size:11.5px; font-weight:700;
+  }
+  .all-done{text-align:center; padding:30px 10px; color:var(--ink-soft);}
+  .all-done .big{font-size:40px; margin-bottom:8px;}
+
+  footer{text-align:center; padding:20px 10px 4px; font-size:11px; color:rgba(255,255,255,.35);}
+
+  /* ---------- Scanner overlay ---------- */
+  .scan-btn{
+    width:100%; display:flex; align-items:center; justify-content:center; gap:10px;
+    background:linear-gradient(180deg, var(--red), #9c0c22);
+    color:#fff; border:none; border-radius:11px; padding:15px 16px;
+    font-family:'Inter'; font-weight:800; font-size:15.5px; letter-spacing:.02em;
+    box-shadow:0 6px 0 #6f0817, 0 10px 18px rgba(200,16,46,.35);
+    cursor:pointer; -webkit-user-select:none; user-select:none;
+    transition:transform .08s ease; margin-bottom:12px;
+  }
+  .scan-btn:active{transform:translateY(4px); box-shadow:0 2px 0 #6f0817;}
+  .scan-btn svg{width:20px; height:20px;}
+  .scanner{
+    display:none; position:fixed; inset:0; background:#000; z-index:100;
+    flex-direction:column;
+  }
+  .scanner.show{display:flex;}
+  .scanner video{
+    flex:1; width:100%; object-fit:cover; background:#111;
+  }
+  .scan-guide{
+    position:absolute; left:50%; top:42%; transform:translate(-50%,-50%);
+    width:72%; max-width:420px; aspect-ratio:4/1;
+    border:2.5px solid var(--gold-hi); border-radius:10px;
+    box-shadow:0 0 0 2000px rgba(0,0,0,.45);
+    pointer-events:none;
+  }
+  .scan-guide::after{
+    content:"Line the code up in here (e.g. URU 10)";
+    position:absolute; top:-30px; left:50%; transform:translateX(-50%);
+    white-space:nowrap; color:#fff; font-size:13px; font-weight:600;
+    text-shadow:0 1px 3px rgba(0,0,0,.8);
+  }
+  .scanner-controls{
+    position:absolute; bottom:0; left:0; right:0; padding:18px 16px 30px;
+    display:flex; gap:10px; align-items:center;
+    background:linear-gradient(transparent, rgba(0,0,0,.75));
+  }
+  .capture-btn{
+    flex:1; padding:16px; border-radius:12px; border:none;
+    background:var(--gold); color:#26200a; font-weight:800; font-size:16px;
+    font-family:'Inter'; cursor:pointer;
+  }
+  .capture-btn:disabled{opacity:.6;}
+  .close-scan-btn{
+    padding:16px 18px; border-radius:12px; border:1px solid rgba(255,255,255,.4);
+    background:rgba(0,0,0,.4); color:#fff; font-weight:700; font-family:'Inter'; cursor:pointer;
+  }
+  .scanner-msg{
+    position:absolute; left:50%; top:58%; transform:translateX(-50%);
+    color:#fff; font-size:14px; font-weight:600; text-shadow:0 1px 3px rgba(0,0,0,.8);
+    text-align:center; width:90%;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="brand">
+      <div class="kicker">Panini · FIFA World Cup</div>
+      <h1>Album <span>26</span></h1>
+    </div>
+    <div class="ring">
+      <svg viewBox="0 0 58 58">
+        <circle class="track" cx="29" cy="29" r="25"></circle>
+        <circle class="prog" id="ringProg" cx="29" cy="29" r="25" stroke-dasharray="157" stroke-dashoffset="157"></circle>
+      </svg>
+      <div class="num" id="ringNum">0%</div>
+    </div>
+  </header>
+
+  <div class="scan-card">
+    <button class="scan-btn" id="scanBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+      Scan a sticker
+    </button>
+    <div class="scan-sub" style="margin-top:0; text-align:left;">Or type the code from the corner of the sticker (e.g. <b>URU10</b>, <b>FWC5</b>, <b>00</b>) and hit Enter.</div>
+    <div class="manual-form show" id="manualForm">
+      <input type="text" id="manualInput" placeholder="e.g. URU10" maxlength="8" autocomplete="off" autocapitalize="characters">
+      <button id="manualAddBtn">Mark stuck</button>
+    </div>
+    <div class="scan-status" id="scanStatus"></div>
+  </div>
+
+  <div class="scanner" id="scanner">
+    <video id="scanVideo" autoplay playsinline muted></video>
+    <div class="scan-guide"></div>
+    <div class="scanner-msg" id="scannerMsg"></div>
+    <div class="scanner-controls">
+      <button class="close-scan-btn" id="closeScanBtn">Close</button>
+      <button class="capture-btn" id="captureBtn">Read code</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="album">Album</div>
+    <div class="tab" data-tab="missing">Missing list</div>
+  </div>
+
+  <div id="albumPanel">
+    <div class="search-row">
+      <input type="text" id="searchInput" placeholder="Search team or code…">
+    </div>
+    <div id="groups"></div>
+  </div>
+
+  <div id="missingPanel" style="display:none;"></div>
+
+  <footer>980 stickers · 48 teams · stored only on this device</footer>
+</div>
+
+<script>
+/* ---------------- Data ---------------- */
+const FLAGS = {PANINI:'🏆',FWC:'🏆',ALG:'🇩🇿',ARG:'🇦🇷',AUS:'🇦🇺',AUT:'🇦🇹',BEL:'🇧🇪',BIH:'🇧🇦',BRA:'🇧🇷',CAN:'🇨🇦',CIV:'🇨🇮',COD:'🇨🇩',COL:'🇨🇴',CPV:'🇨🇻',CRO:'🇭🇷',CUW:'🇨🇼',CZE:'🇨🇿',ECU:'🇪🇨',EGY:'🇪🇬',ENG:'🏴',ESP:'🇪🇸',FRA:'🇫🇷',GER:'🇩🇪',GHA:'🇬🇭',HAI:'🇭🇹',IRN:'🇮🇷',IRQ:'🇮🇶',JOR:'🇯🇴',JPN:'🇯🇵',KOR:'🇰🇷',KSA:'🇸🇦',MAR:'🇲🇦',MEX:'🇲🇽',NED:'🇳🇱',NOR:'🇳🇴',NZL:'🇳🇿',PAN:'🇵🇦',PAR:'🇵🇾',POR:'🇵🇹',QAT:'🇶🇦',RSA:'🇿🇦',SCO:'🏴',SEN:'🇸🇳',SUI:'🇨🇭',SWE:'🇸🇪',TUN:'🇹🇳',TUR:'🇹🇷',URU:'🇺🇾',USA:'🇺🇸',UZB:'🇺🇿'};
+const NAMES = {PANINI:'Panini',FWC:'World Cup History',ALG:'Algeria',ARG:'Argentina',AUS:'Australia',AUT:'Austria',BEL:'Belgium',BIH:'Bosnia & Herzegovina',BRA:'Brazil',CAN:'Canada',CIV:"Côte d'Ivoire",COD:'DR Congo',COL:'Colombia',CPV:'Cape Verde',CRO:'Croatia',CUW:'Curaçao',CZE:'Czechia',ECU:'Ecuador',EGY:'Egypt',ENG:'England',ESP:'Spain',FRA:'France',GER:'Germany',GHA:'Ghana',HAI:'Haiti',IRN:'Iran',IRQ:'Iraq',JOR:'Jordan',JPN:'Japan',KOR:'South Korea',KSA:'Saudi Arabia',MAR:'Morocco',MEX:'Mexico',NED:'Netherlands',NOR:'Norway',NZL:'New Zealand',PAN:'Panama',PAR:'Paraguay',POR:'Portugal',QAT:'Qatar',RSA:'South Africa',SCO:'Scotland',SEN:'Senegal',SUI:'Switzerland',SWE:'Sweden',TUN:'Tunisia',TUR:'Turkey',URU:'Uruguay',USA:'United States',UZB:'Uzbekistan'};
+
+const FWC_LABELS = {1:'Official Emblem',2:'Mascots',3:'Slogan',4:'Official Ball',5:'Trophy',6:'Host: Canada',7:'Host: Mexico',8:'Host: USA',9:'Museum: Italy 1934',10:'Museum: Uruguay 1950',11:'Museum: W. Germany 1954',12:'Museum: Brazil 1962',13:'Museum: W. Germany 1974',14:'Museum: Argentina 1986',15:'Museum: Brazil 1994',16:'Museum: Brazil 2002',17:'Museum: Italy 2006',18:'Museum: Germany 2014',19:'Museum: Argentina 2022'};
+
+const TEAM_CODES = ['ALG','ARG','AUS','AUT','BEL','BIH','BRA','CAN','CIV','COD','COL','CPV','CRO','CUW','CZE','ECU','EGY','ENG','ESP','FRA','GER','GHA','HAI','IRN','IRQ','JOR','JPN','KOR','KSA','MAR','MEX','NED','NOR','NZL','PAN','PAR','POR','QAT','RSA','SCO','SEN','SUI','SWE','TUN','TUR','URU','USA','UZB'];
+
+function buildAlbum(){
+  const groups = [];
+  // Special group: Panini logo + FWC history
+  const special = {code:'SPECIAL', name:'Special & Tournament', flag:'🏆', stickers:[]};
+  special.stickers.push({code:'00', label:'Panini logo'});
+  for(let i=1;i<=19;i++) special.stickers.push({code:'FWC'+i, label:FWC_LABELS[i]});
+  groups.push(special);
+
+  TEAM_CODES.forEach(tc=>{
+    const g = {code:tc, name:NAMES[tc], flag:FLAGS[tc], stickers:[]};
+    for(let i=1;i<=20;i++){
+      let label;
+      if(i===1) label='Team logo';
+      else if(i===13) label='Team photo';
+      else label='Player '+i;
+      g.stickers.push({code:tc+i, label});
+    }
+    groups.push(g);
+  });
+  return groups;
+}
+const ALBUM = buildAlbum();
+const ALL_CODES = ALBUM.flatMap(g=>g.stickers.map(s=>s.code));
+const TOTAL = ALL_CODES.length;
+
+/* ---------------- Storage ---------------- */
+/* Uses Claude's storage API when available (in-app preview); falls back to
+   the browser's localStorage when hosted (e.g. on Netlify). */
+let owned = new Set();
+const STORE_KEY = 'owned-stickers-wc26';
+const hasClaudeStore = typeof window.storage !== 'undefined' && window.storage && typeof window.storage.get === 'function';
+
+async function loadOwned(){
+  try{
+    if(hasClaudeStore){
+      const res = await window.storage.get(STORE_KEY);
+      if(res && res.value){ owned = new Set(JSON.parse(res.value)); }
+    }else{
+      const raw = localStorage.getItem(STORE_KEY);
+      if(raw){ owned = new Set(JSON.parse(raw)); }
+    }
+  }catch(e){ owned = new Set(); }
+  render();
+}
+async function saveOwned(){
+  const payload = JSON.stringify(Array.from(owned));
+  try{
+    if(hasClaudeStore){ await window.storage.set(STORE_KEY, payload); }
+    else{ localStorage.setItem(STORE_KEY, payload); }
+  }catch(e){ console.error('save failed', e); }
+}
+
+/* ---------------- Rendering ---------------- */
+const groupsEl = document.getElementById('groups');
+const ringProg = document.getElementById('ringProg');
+const ringNum = document.getElementById('ringNum');
+const CIRC = 157;
+
+function codeInfo(code){
+  for(const g of ALBUM){
+    const s = g.stickers.find(x=>x.code===code);
+    if(s) return {group:g, sticker:s};
+  }
+  return null;
+}
+
+function render(searchTerm){
+  const term = (searchTerm||'').trim().toLowerCase();
+  groupsEl.innerHTML = '';
+  ALBUM.forEach(g=>{
+    const ownedCount = g.stickers.filter(s=>owned.has(s.code)).length;
+    const matchesSearch = !term || g.name.toLowerCase().includes(term) || g.code.toLowerCase().includes(term) || g.stickers.some(s=>s.code.toLowerCase().includes(term));
+    if(!matchesSearch) return;
+
+    const div = document.createElement('div');
+    div.className = 'group';
+    div.dataset.code = g.code;
+    div.innerHTML = `
+      <div class="group-head">
+        <span class="flag">${g.flag}</span>
+        <span class="gname">${g.name}</span>
+        <span class="gcount">${ownedCount}/${g.stickers.length}</span>
+        <span class="chev">▾</span>
+      </div>
+      <div class="group-bar"><div class="group-bar-fill" style="width:${(ownedCount/g.stickers.length*100)}%"></div></div>
+      <div class="grid">
+        ${g.stickers.map(s=>`
+          <div class="sticker ${owned.has(s.code)?'owned':'missing'}" data-code="${s.code}">
+            <div class="code">${s.code}</div>
+            <div class="lbl">${s.label}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+    groupsEl.appendChild(div);
+  });
+
+  // overall ring
+  const totalOwned = owned.size;
+  const pct = TOTAL ? Math.round(totalOwned/TOTAL*100) : 0;
+  ringProg.style.strokeDashoffset = CIRC - (CIRC*pct/100);
+  ringNum.textContent = pct+'%';
+
+  renderMissingPanel();
+}
+
+function toggleSticker(code){
+  if(owned.has(code)) owned.delete(code); else owned.add(code);
+  saveOwned();
+  render(document.getElementById('searchInput').value);
+}
+
+groupsEl.addEventListener('click', e=>{
+  const head = e.target.closest('.group-head');
+  if(head){
+    head.closest('.group').classList.toggle('open');
+    return;
+  }
+  const st = e.target.closest('.sticker');
+  if(st){ toggleSticker(st.dataset.code); }
+});
+
+document.getElementById('searchInput').addEventListener('input', e=>{
+  render(e.target.value);
+  if(e.target.value.trim()){
+    document.querySelectorAll('.group').forEach(g=>g.classList.add('open'));
+  }
+});
+
+/* ---------------- Tabs ---------------- */
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    const isAlbum = t.dataset.tab==='album';
+    document.getElementById('albumPanel').style.display = isAlbum ? 'block':'none';
+    document.getElementById('missingPanel').style.display = isAlbum ? 'none':'block';
+  });
+});
+
+function renderMissingPanel(){
+  const panel = document.getElementById('missingPanel');
+  const missingByGroup = ALBUM.map(g=>({
+    ...g, missing: g.stickers.filter(s=>!owned.has(s.code))
+  })).filter(g=>g.missing.length>0);
+
+  const totalMissing = TOTAL - owned.size;
+
+  if(missingByGroup.length===0){
+    panel.innerHTML = `<div class="missing-panel"><div class="all-done"><div class="big">🏆</div><b>Album complete!</b><div style="margin-top:6px;">All 980 stickers stuck in.</div></div></div>`;
+    return;
+  }
+
+  panel.innerHTML = `
+    <div class="missing-panel">
+      <h2>${totalMissing} missing</h2>
+      <p class="sub">Grouped by team — copy the list to share in a swap chat.</p>
+      <button class="copy-btn" id="copyMissingBtn">Copy missing list</button>
+      <div id="missingList"></div>
+    </div>
+  `;
+  const listEl = document.getElementById('missingList');
+  missingByGroup.forEach(g=>{
+    const row = document.createElement('div');
+    row.className = 'missing-team';
+    row.innerHTML = `
+      <div class="mt-head">${g.flag} ${g.name} <span style="color:var(--ink-soft); font-weight:600;">(${g.missing.length})</span></div>
+      <div class="missing-codes">${g.missing.map(s=>`<span class="mchip">${s.code}</span>`).join('')}</div>
+    `;
+    listEl.appendChild(row);
+  });
+
+  document.getElementById('copyMissingBtn').addEventListener('click', ()=>{
+    const text = missingByGroup.map(g=>`${g.flag} ${g.name}: ${g.missing.map(s=>s.code).join(', ')}`).join('\n');
+    navigator.clipboard?.writeText(text).then(()=>{
+      const btn = document.getElementById('copyMissingBtn');
+      const old = btn.textContent;
+      btn.textContent = 'Copied ✓';
+      setTimeout(()=>btn.textContent=old, 1600);
+    });
+  });
+}
+
+/* ---------------- Manual code entry ---------------- */
+const scanStatus = document.getElementById('scanStatus');
+const CODE_SET = new Set(ALL_CODES);
+
+function setStatus(kind, html){
+  scanStatus.className = 'scan-status show ' + kind;
+  scanStatus.innerHTML = html;
+}
+function clearStatusLater(){
+  setTimeout(()=>{ scanStatus.className='scan-status'; }, 2600);
+}
+
+function handleEnteredCode(rawInput){
+  const code = rawInput.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(!code) return;
+  if(!CODE_SET.has(code)){
+    setStatus('fail', `⚠️ "${code}" isn't a code in this album — double check it (team code + number, e.g. URU10, or FWC5, or 00).`);
+    clearStatusLater();
+    return;
+  }
+  const info = codeInfo(code);
+  if(owned.has(code)){
+    setStatus('dupe', `📎 Already stuck in — ${info.group.flag} ${info.sticker.code} (${info.sticker.label}). That's a spare for swapping!`);
+  }else{
+    owned.add(code);
+    saveOwned();
+    render(document.getElementById('searchInput').value);
+    setStatus('ok', `✓ Stuck in — ${info.group.flag} ${info.sticker.code} · ${info.group.name}, ${info.sticker.label}`);
+  }
+  clearStatusLater();
+}
+
+const manualInput = document.getElementById('manualInput');
+document.getElementById('manualAddBtn').addEventListener('click', ()=>{
+  handleEnteredCode(manualInput.value);
+  manualInput.value = '';
+  manualInput.focus();
+});
+manualInput.addEventListener('keydown', e=>{
+  if(e.key==='Enter'){
+    handleEnteredCode(manualInput.value);
+    manualInput.value = '';
+  }
+});
+
+/* ---------------- Camera OCR scanning (Tesseract.js) ---------------- */
+const scanner = document.getElementById('scanner');
+const scanVideo = document.getElementById('scanVideo');
+const scannerMsg = document.getElementById('scannerMsg');
+const captureBtn = document.getElementById('captureBtn');
+let mediaStream = null;
+let ocrWorker = null;
+
+// longest first so FWC10 matches before shorter codes
+const SORTED_CODES = ALL_CODES.slice().sort((a,b)=>b.length-a.length);
+
+function loadTesseract(){
+  return new Promise((resolve,reject)=>{
+    if(window.Tesseract) return resolve();
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/5.1.0/tesseract.min.js';
+    s.onload = resolve;
+    s.onerror = ()=>reject(new Error('Could not load the text-recognition library — check your internet connection.'));
+    document.head.appendChild(s);
+  });
+}
+
+async function getOcrWorker(){
+  if(ocrWorker) return ocrWorker;
+  await loadTesseract();
+  ocrWorker = await Tesseract.createWorker('eng');
+  await ocrWorker.setParameters({
+    tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 ',
+  });
+  return ocrWorker;
+}
+
+document.getElementById('scanBtn').addEventListener('click', async ()=>{
+  if(location.protocol !== 'https:' && location.hostname !== 'localhost'){
+    setStatus('fail', '⚠️ Camera scanning only works when this page is hosted on https (e.g. your Netlify site) — not when opened as a local file or inside an app preview. Use the code box below instead here.');
+    clearStatusLater();
+    return;
+  }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    setStatus('fail', '⚠️ This browser doesn\'t allow camera access here. Use the code box below instead.');
+    clearStatusLater();
+    return;
+  }
+  try{
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      video:{ facingMode:'environment', width:{ideal:1920}, height:{ideal:1080} }
+    });
+    scanVideo.srcObject = mediaStream;
+    scanner.classList.add('show');
+    scannerMsg.textContent = '';
+    captureBtn.disabled = false;
+    captureBtn.textContent = 'Read code';
+    // warm up OCR in the background while the user aims
+    getOcrWorker().catch(()=>{});
+  }catch(e){
+    setStatus('fail', '⚠️ Camera permission was refused or unavailable. Allow camera access for this site in Chrome, or use the code box below.');
+    clearStatusLater();
+  }
+});
+
+function closeScanner(){
+  scanner.classList.remove('show');
+  if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream = null; }
+  scanVideo.srcObject = null;
+}
+document.getElementById('closeScanBtn').addEventListener('click', closeScanner);
+
+function grabGuideRegion(){
+  const vw = scanVideo.videoWidth, vh = scanVideo.videoHeight;
+  if(!vw || !vh) return null;
+  // The guide box: centred horizontally, at 42% height, 72% of the *displayed* width, 4:1 aspect.
+  // The video uses object-fit:cover, so map the on-screen guide back to source pixels.
+  const dispW = scanVideo.clientWidth, dispH = scanVideo.clientHeight;
+  const scale = Math.max(dispW/vw, dispH/vh);
+  const visW = dispW/scale, visH = dispH/scale;      // visible source region
+  const offX = (vw - visW)/2, offY = (vh - visH)/2;
+  const gW = Math.min(0.72*dispW, 420)/scale;
+  const gH = gW/4;
+  const gX = offX + (visW - gW)/2;
+  const gY = offY + visH*0.42 - gH/2;
+
+  // Crop, upscale 2x, grayscale + contrast stretch for better OCR
+  const outW = Math.round(gW*2), outH = Math.round(gH*2);
+  const canvas = document.createElement('canvas');
+  canvas.width = outW; canvas.height = outH;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(scanVideo, gX, gY, gW, gH, 0, 0, outW, outH);
+  const img = ctx.getImageData(0,0,outW,outH);
+  const d = img.data;
+  let min=255, max=0;
+  for(let i=0;i<d.length;i+=4){
+    const g = 0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
+    if(g<min)min=g; if(g>max)max=g;
+    d[i]=d[i+1]=d[i+2]=g;
+  }
+  const range = Math.max(1, max-min);
+  for(let i=0;i<d.length;i+=4){
+    const v = Math.max(0, Math.min(255, (d[i]-min)*255/range));
+    d[i]=d[i+1]=d[i+2]=v;
+  }
+  ctx.putImageData(img,0,0);
+  return canvas;
+}
+
+function matchOcrText(text){
+  const cleaned = (text||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  if(!cleaned) return null;
+  if(CODE_SET.has(cleaned)) return cleaned;
+  for(const code of SORTED_CODES){
+    if(cleaned.includes(code)) return code;
+  }
+  // common OCR confusions on the digits: O↔0, I/L↔1, S↔5, B↔8
+  const fixed = cleaned.replace(/O/g,'0').replace(/[IL]/g,'1').replace(/S/g,'5').replace(/B/g,'8');
+  if(CODE_SET.has(fixed)) return fixed;
+  for(const code of SORTED_CODES){
+    if(fixed.includes(code)) return code;
+  }
+  return null;
+}
+
+captureBtn.addEventListener('click', async ()=>{
+  captureBtn.disabled = true;
+  captureBtn.textContent = 'Reading…';
+  scannerMsg.textContent = '';
+  try{
+    const canvas = grabGuideRegion();
+    if(!canvas) throw new Error('Camera not ready yet — give it a second.');
+    const worker = await getOcrWorker();
+    const {data} = await worker.recognize(canvas);
+    const code = matchOcrText(data.text);
+    if(code){
+      closeScanner();
+      handleEnteredCode(code);
+    }else{
+      scannerMsg.textContent = `Read "${(data.text||'').trim().slice(0,25) || 'nothing'}" — not a code I know. Get closer, keep it level, and try again.`;
+    }
+  }catch(e){
+    scannerMsg.textContent = e.message || 'Couldn\'t read that — try again.';
+  }
+  captureBtn.disabled = false;
+  captureBtn.textContent = 'Read code';
+});
+
+loadOwned();
+</script>
+</body>
+</html>
