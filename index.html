@@ -654,18 +654,38 @@ function grabGuideRegion(){
   return canvas;
 }
 
+/* Map visually-confusable characters to one canonical form, so e.g.
+   OCR reading "OAT 3" or "0AT 3" still matches QAT3 (Panini's Q has
+   almost no tail), "URLI10" ~ URU10, etc. */
+const CONFUSION = {'O':'0','Q':'0','D':'0','I':'1','L':'1','S':'5','B':'8','G':'6','Z':'2','U':'U','V':'U'};
+function canon(str){
+  let out='';
+  for(const ch of str){ out += (CONFUSION[ch]||ch); }
+  return out;
+}
+const CANON_TO_CODE = {};
+for(const code of SORTED_CODES){
+  const c = canon(code);
+  // first (longest) code wins for a given canonical form
+  if(!(c in CANON_TO_CODE)) CANON_TO_CODE[c] = code;
+}
+
 function matchOcrText(text){
   const cleaned = (text||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
   if(!cleaned) return null;
+  // 1. exact
   if(CODE_SET.has(cleaned)) return cleaned;
   for(const code of SORTED_CODES){
     if(cleaned.includes(code)) return code;
   }
-  // common OCR confusions on the digits: O↔0, I/L↔1, S↔5, B↔8
-  const fixed = cleaned.replace(/O/g,'0').replace(/[IL]/g,'1').replace(/S/g,'5').replace(/B/g,'8');
-  if(CODE_SET.has(fixed)) return fixed;
-  for(const code of SORTED_CODES){
-    if(fixed.includes(code)) return code;
+  // 2. confusion-tolerant: canonicalize and look for any known code's
+  //    canonical form inside the canonicalized text
+  const canonText = canon(cleaned);
+  if(CANON_TO_CODE[canonText]) return CANON_TO_CODE[canonText];
+  const canonKeys = Object.keys(CANON_TO_CODE).sort((a,b)=>b.length-a.length);
+  for(const key of canonKeys){
+    if(key.length <= 2) continue; // short codes ("00") only match exactly, never by substring
+    if(canonText.includes(key)) return CANON_TO_CODE[key];
   }
   return null;
 }
