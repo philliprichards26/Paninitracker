@@ -275,6 +275,11 @@
     width:26px; height:26px; font-size:15px; font-weight:800; cursor:pointer;
     display:flex; align-items:center; justify-content:center; font-family:'Inter';
   }
+  .recent-chip .chip-code{cursor:pointer; text-decoration:underline dotted; text-underline-offset:3px;}
+  .recent-chip .chip-input{
+    width:76px; border:1.5px solid var(--gold); border-radius:6px; padding:4px 6px;
+    font-family:'Space Mono',monospace; font-weight:700; font-size:13px; text-transform:uppercase;
+  }
 </style>
 </head>
 <body>
@@ -332,7 +337,7 @@
 
   <div id="missingPanel" style="display:none;"></div>
 
-  <footer>980 stickers · 48 teams · stored only on this device · <b style="color:var(--gold-hi);">app v9</b></footer>
+  <footer>980 stickers · 48 teams · stored only on this device · <b style="color:var(--gold-hi);">app v10</b></footer>
 </div>
 
 <script>
@@ -670,7 +675,9 @@ async function scanLoop(){
         acceptScan(code);
         lastAccepted = code; lastAcceptedAt = now; lastRead = null;
         hideConfirmTick();
-      }else{
+      }else if(!pendingCode || now - pendingSince > 5000){
+        // only propose a new fuzzy code if nothing is pending, or the current
+        // proposal has been on screen 5s — stops the button flickering between reads
         lastRead = code;
         scannerMsg.textContent = `Seeing ${code} — hold still, or confirm:`;
         showConfirmTick(code);
@@ -702,8 +709,10 @@ function acceptScan(code){
 /* --- confirm tick: accept a fuzzy read with one tap instead of waiting --- */
 const confirmTickBtn = document.getElementById('confirmTickBtn');
 let pendingCode = null;
+let pendingSince = 0;
 function showConfirmTick(code){
   pendingCode = code;
+  pendingSince = Date.now();
   confirmTickBtn.textContent = `✓ Yes, it's ${code}`;
   confirmTickBtn.classList.add('show');
 }
@@ -718,21 +727,52 @@ confirmTickBtn.addEventListener('click', ()=>{
   hideConfirmTick();
 });
 
-/* --- recent scans strip: undo a wrong scan with one tap --- */
+/* --- recent scans strip: tap ✕ to remove, tap the code to quick-edit it --- */
 const recentStrip = document.getElementById('recentStrip');
 function addRecentChip(code){
   const chip = document.createElement('div');
   chip.className = 'recent-chip';
-  chip.innerHTML = `<span>${code}</span><button class="undo" title="Remove">✕</button>`;
-  chip.querySelector('.undo').addEventListener('click', ()=>{
-    owned.delete(code);
+  renderChipNormal(chip, code);
+  recentStrip.prepend(chip);
+  while(recentStrip.children.length > 6) recentStrip.lastChild.remove();
+}
+
+function renderChipNormal(chip, code){
+  chip.dataset.code = code;
+  chip.innerHTML = `<span class="chip-code">${code}</span><button class="undo" title="Remove">✕</button>`;
+  chip.querySelector('.undo').addEventListener('click', e=>{
+    e.stopPropagation();
+    owned.delete(chip.dataset.code);
     saveOwned();
     render(document.getElementById('searchInput').value);
     chip.remove();
     if(navigator.vibrate) navigator.vibrate(40);
   });
-  recentStrip.prepend(chip);
-  while(recentStrip.children.length > 6) recentStrip.lastChild.remove();
+  chip.querySelector('.chip-code').addEventListener('click', ()=> renderChipEdit(chip));
+}
+
+function renderChipEdit(chip){
+  const code = chip.dataset.code;
+  chip.innerHTML = `<input class="chip-input" value="${code}" maxlength="8" autocapitalize="characters" autocomplete="off"><button class="undo chip-ok" style="background:#1e5c25;">✓</button>`;
+  const input = chip.querySelector('.chip-input');
+  input.focus();
+  // put the cursor at the end, where the number is
+  input.setSelectionRange(code.length, code.length);
+  const commit = ()=>{
+    const newCode = input.value.trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if(!CODE_SET.has(newCode)){
+      input.style.background = '#fde7e7';
+      return; // invalid — stay in edit mode
+    }
+    owned.delete(code);
+    owned.add(newCode);
+    saveOwned();
+    render(document.getElementById('searchInput').value);
+    renderChipNormal(chip, newCode);
+    if(navigator.vibrate) navigator.vibrate(60);
+  };
+  chip.querySelector('.chip-ok').addEventListener('click', commit);
+  input.addEventListener('keydown', e=>{ if(e.key==='Enter') commit(); });
 }
 
 function stopScanLoop(){ scanning = false; }
