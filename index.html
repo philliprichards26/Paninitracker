@@ -310,7 +310,7 @@
 
   <div id="missingPanel" style="display:none;"></div>
 
-  <footer>980 stickers · 48 teams · stored only on this device · <b style="color:var(--gold-hi);">app v4</b></footer>
+  <footer>980 stickers · 48 teams · stored only on this device · <b style="color:var(--gold-hi);">app v5</b></footer>
 </div>
 
 <script>
@@ -674,15 +674,13 @@ for(const code of SORTED_CODES){
 function matchOcrText(text){
   const cleaned = (text||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
   if(!cleaned) return null;
-  // 1. exact
+  // 1. exact match on the raw text
   if(CODE_SET.has(cleaned)) return cleaned;
-  for(const code of SORTED_CODES){
-    if(cleaned.includes(code)) return code;
-  }
-  // 2. confusion-tolerant: canonicalize and look for any known code's
-  //    canonical form inside the canonicalized text
+  // 2. exact match after look-alike correction (URU1O -> URU10, OAT3 -> QAT3)
   const canonText = canon(cleaned);
   if(CANON_TO_CODE[canonText]) return CANON_TO_CODE[canonText];
+  // 3. substring search in corrected space only, longest codes first,
+  //    so URU10 is found inside noise before URU1 can steal the match
   const canonKeys = Object.keys(CANON_TO_CODE).sort((a,b)=>b.length-a.length);
   for(const key of canonKeys){
     if(key.length <= 2) continue; // short codes ("00") only match exactly, never by substring
