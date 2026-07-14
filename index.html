@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Album Tracker — FIFA World Cup 2026</title>
+<title>Sticker Album 26</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -153,6 +153,25 @@
     width:100%; padding:12px 14px; border-radius:10px; border:none;
     background:rgba(255,255,255,.92); font-family:'Inter'; font-size:14.5px;
   }
+
+  .sort-toggle{display:flex; gap:6px; margin-bottom:14px;}
+  .sort-btn{
+    flex:1; padding:9px 8px; border-radius:9px; border:1px solid rgba(255,255,255,.25);
+    background:rgba(255,255,255,.08); color:rgba(255,255,255,.75);
+    font-family:'Inter'; font-weight:700; font-size:13px; cursor:pointer;
+  }
+  .sort-btn.active{background:var(--paper); color:var(--ink); border-color:var(--paper);}
+  .wc-group{margin-bottom:16px;}
+  .wc-group-head{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:10px 14px; margin-bottom:8px; border-radius:10px; cursor:pointer;
+    background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.18);
+    color:#fff;
+  }
+  .wc-group-head .wg-name{font-family:'Anton',sans-serif; font-size:17px; letter-spacing:.5px;}
+  .wc-group-head .wg-count{font-family:'Space Mono',monospace; font-size:12.5px; font-weight:700; color:var(--gold-hi);}
+  .wc-group-body{display:none;}
+  .wc-group.open .wc-group-body{display:block;}
 
   /* ---------- Album groups ---------- */
   .group{margin-bottom:14px; background:var(--paper); border-radius:var(--radius); overflow:hidden; box-shadow:0 6px 18px rgba(0,0,0,.25);}
@@ -304,7 +323,7 @@
 
   <header>
     <div class="brand">
-      <div class="kicker">Panini · FIFA World Cup</div>
+      <div class="kicker">Sticker Collection Tracker</div>
       <h1>Album <span>26</span></h1>
       <div class="total-line"><span id="totalCount">0</span> / 980 stickers</div>
     </div>
@@ -350,12 +369,16 @@
     <div class="search-row">
       <input type="text" id="searchInput" placeholder="Search team or code…">
     </div>
+    <div class="sort-toggle">
+      <button class="sort-btn active" data-sort="alpha">A → Z</button>
+      <button class="sort-btn" data-sort="groups">By group</button>
+    </div>
     <div id="groups"></div>
   </div>
 
   <div id="missingPanel" style="display:none;"></div>
 
-  <footer>980 stickers · 48 teams · stored only on this device · <b style="color:var(--gold-hi);">app v12</b><br><button id="resetBtn" style="margin-top:8px;background:none;border:none;color:rgba(255,255,255,.5);font-size:11px;text-decoration:underline;cursor:pointer;font-family:'Inter';">reset album to zero</button></footer>
+  <footer>980 stickers · 48 teams · stored only on this device · <b style="color:var(--gold-hi);">app v13</b><br><button id="resetBtn" style="margin-top:8px;background:none;border:none;color:rgba(255,255,255,.5);font-size:11px;text-decoration:underline;cursor:pointer;font-family:'Inter';">reset album to zero</button></footer>
 </div>
 
 <script>
@@ -366,6 +389,15 @@ const NAMES = {PANINI:'Panini',FWC:'World Cup History',ALG:'Algeria',ARG:'Argent
 const FWC_LABELS = {1:'Official Emblem',2:'Mascots',3:'Slogan',4:'Official Ball',5:'Trophy',6:'Host: Canada',7:'Host: Mexico',8:'Host: USA',9:'Museum: Italy 1934',10:'Museum: Uruguay 1950',11:'Museum: W. Germany 1954',12:'Museum: Brazil 1962',13:'Museum: W. Germany 1974',14:'Museum: Argentina 1986',15:'Museum: Brazil 1994',16:'Museum: Brazil 2002',17:'Museum: Italy 2006',18:'Museum: Germany 2014',19:'Museum: Argentina 2022'};
 
 const TEAM_CODES = ['ALG','ARG','AUS','AUT','BEL','BIH','BRA','CAN','CIV','COD','COL','CPV','CRO','CUW','CZE','ECU','EGY','ENG','ESP','FRA','GER','GHA','HAI','IRN','IRQ','JOR','JPN','KOR','KSA','MAR','MEX','NED','NOR','NZL','PAN','PAR','POR','QAT','RSA','SCO','SEN','SUI','SWE','TUN','TUR','URU','USA','UZB'];
+
+// 2026 tournament groups (final draw order)
+const WC_GROUPS = {
+  A:['MEX','RSA','KOR','CZE'], B:['CAN','SUI','BIH','QAT'], C:['BRA','MAR','SCO','HAI'],
+  D:['USA','AUS','PAR','TUR'], E:['GER','CIV','ECU','CUW'], F:['NED','JPN','SWE','TUN'],
+  G:['BEL','EGY','IRN','NZL'], H:['ESP','CPV','URU','KSA'], I:['FRA','NOR','SEN','IRQ'],
+  J:['ARG','AUT','ALG','JOR'], K:['COL','POR','COD','UZB'], L:['ENG','CRO','GHA','PAN']
+};
+let sortMode = 'alpha'; // 'alpha' | 'groups'
 
 function buildAlbum(){
   const groups = [];
@@ -433,36 +465,71 @@ function codeInfo(code){
   return null;
 }
 
+function groupMatches(g, term){
+  return !term || g.name.toLowerCase().includes(term) || g.code.toLowerCase().includes(term) || g.stickers.some(s=>s.code.toLowerCase().includes(term));
+}
+
+function buildTeamBlock(g){
+  const ownedCount = g.stickers.filter(s=>owned.has(s.code)).length;
+  const div = document.createElement('div');
+  div.className = 'group';
+  div.dataset.code = g.code;
+  div.innerHTML = `
+    <div class="group-head">
+      <span class="flag">${g.flag}</span>
+      <span class="gname">${g.name}</span>
+      <span class="gcount">${ownedCount}/${g.stickers.length}</span>
+      <span class="chev">▾</span>
+    </div>
+    <div class="group-bar"><div class="group-bar-fill" style="width:${(ownedCount/g.stickers.length*100)}%"></div></div>
+    <div class="grid">
+      ${g.stickers.map(s=>`
+        <div class="sticker ${owned.has(s.code)?'owned':'missing'}" data-code="${s.code}">
+          <div class="code">${s.code}</div>
+          <div class="lbl">${s.label}</div>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  return div;
+}
+
 function render(searchTerm){
   const term = (searchTerm||'').trim().toLowerCase();
   groupsEl.innerHTML = '';
-  ALBUM.forEach(g=>{
-    const ownedCount = g.stickers.filter(s=>owned.has(s.code)).length;
-    const matchesSearch = !term || g.name.toLowerCase().includes(term) || g.code.toLowerCase().includes(term) || g.stickers.some(s=>s.code.toLowerCase().includes(term));
-    if(!matchesSearch) return;
 
-    const div = document.createElement('div');
-    div.className = 'group';
-    div.dataset.code = g.code;
-    div.innerHTML = `
-      <div class="group-head">
-        <span class="flag">${g.flag}</span>
-        <span class="gname">${g.name}</span>
-        <span class="gcount">${ownedCount}/${g.stickers.length}</span>
-        <span class="chev">▾</span>
-      </div>
-      <div class="group-bar"><div class="group-bar-fill" style="width:${(ownedCount/g.stickers.length*100)}%"></div></div>
-      <div class="grid">
-        ${g.stickers.map(s=>`
-          <div class="sticker ${owned.has(s.code)?'owned':'missing'}" data-code="${s.code}">
-            <div class="code">${s.code}</div>
-            <div class="lbl">${s.label}</div>
-          </div>
-        `).join('')}
-      </div>
-    `;
-    groupsEl.appendChild(div);
-  });
+  if(sortMode === 'groups'){
+    // Special section first, then Groups A–L, each with its four teams
+    const special = ALBUM.find(g=>g.code==='SPECIAL');
+    if(groupMatches(special, term)) groupsEl.appendChild(buildTeamBlock(special));
+
+    for(const [letter, codes] of Object.entries(WC_GROUPS)){
+      const teams = codes.map(c=>ALBUM.find(g=>g.code===c)).filter(g=>groupMatches(g, term));
+      if(!teams.length) continue;
+      const gOwned = codes.reduce((n,c)=>{
+        const t = ALBUM.find(g=>g.code===c);
+        return n + t.stickers.filter(s=>owned.has(s.code)).length;
+      }, 0);
+      const wrap = document.createElement('div');
+      wrap.className = 'wc-group' + (term ? ' open' : '');
+      wrap.innerHTML = `
+        <div class="wc-group-head">
+          <span class="wg-name">Group ${letter}</span>
+          <span class="wg-count">${gOwned}/80 ▾</span>
+        </div>
+        <div class="wc-group-body"></div>
+      `;
+      const body = wrap.querySelector('.wc-group-body');
+      teams.forEach(t=> body.appendChild(buildTeamBlock(t)));
+      wrap.querySelector('.wc-group-head').addEventListener('click', ()=> wrap.classList.toggle('open'));
+      groupsEl.appendChild(wrap);
+    }
+  }else{
+    ALBUM.forEach(g=>{
+      if(!groupMatches(g, term)) return;
+      groupsEl.appendChild(buildTeamBlock(g));
+    });
+  }
 
   // overall ring
   const totalOwned = owned.size;
@@ -473,6 +540,8 @@ function render(searchTerm){
 
   renderMissingPanel();
 }
+
+
 
 function toggleSticker(code){
   if(owned.has(code)) owned.delete(code); else owned.add(code);
@@ -488,6 +557,15 @@ groupsEl.addEventListener('click', e=>{
   }
   const st = e.target.closest('.sticker');
   if(st){ toggleSticker(st.dataset.code); }
+});
+
+document.querySelectorAll('.sort-btn').forEach(b=>{
+  b.addEventListener('click', ()=>{
+    document.querySelectorAll('.sort-btn').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    sortMode = b.dataset.sort;
+    render(document.getElementById('searchInput').value);
+  });
 });
 
 document.getElementById('searchInput').addEventListener('input', e=>{
