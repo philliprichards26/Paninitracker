@@ -291,8 +291,7 @@
     <div class="scan-guide"></div>
     <div class="scanner-msg" id="scannerMsg"></div>
     <div class="scanner-controls">
-      <button class="close-scan-btn" id="closeScanBtn">Close</button>
-      <button class="capture-btn" id="captureBtn">Read code</button>
+      <button class="close-scan-btn" id="closeScanBtn" style="flex:1;">Done scanning</button>
     </div>
   </div>
 
@@ -310,7 +309,7 @@
 
   <div id="missingPanel" style="display:none;"></div>
 
-  <footer>980 stickers · 48 teams · stored only on this device · <b style="color:var(--gold-hi);">app v6</b></footer>
+  <footer>980 stickers · 48 teams · stored only on this device · <b style="color:var(--gold-hi);">app v7</b></footer>
 </div>
 
 <script>
@@ -554,7 +553,6 @@ manualInput.addEventListener('keydown', e=>{
 const scanner = document.getElementById('scanner');
 const scanVideo = document.getElementById('scanVideo');
 const scannerMsg = document.getElementById('scannerMsg');
-const captureBtn = document.getElementById('captureBtn');
 let mediaStream = null;
 let ocrWorker = null;
 
@@ -585,7 +583,7 @@ async function getOcrWorker(){
 
 document.getElementById('scanBtn').addEventListener('click', async ()=>{
   if(location.protocol !== 'https:' && location.hostname !== 'localhost'){
-    setStatus('fail', '⚠️ Camera scanning only works when this page is hosted on https (e.g. your Netlify site) — not when opened as a local file or inside an app preview. Use the code box below instead here.');
+    setStatus('fail', '⚠️ Camera scanning only works when this page is hosted on https (e.g. your GitHub Pages site) — not when opened as a local file or inside an app preview. Use the code box below instead here.');
     clearStatusLater();
     return;
   }
@@ -600,25 +598,91 @@ document.getElementById('scanBtn').addEventListener('click', async ()=>{
     });
     scanVideo.srcObject = mediaStream;
     scanner.classList.add('show');
-    scannerMsg.textContent = '';
-    captureBtn.disabled = false;
-    captureBtn.textContent = 'Read code';
-    // warm up OCR in the background while the user aims
-    getOcrWorker().catch(()=>{});
+    scannerMsg.textContent = 'Starting up…';
+    startScanLoop();
   }catch(e){
     setStatus('fail', '⚠️ Camera permission was refused or unavailable. Allow camera access for this site in Chrome, or use the code box below.');
     clearStatusLater();
   }
 });
 
+let scanning = false;
+let lastRead = null;          // last code seen (for double confirmation)
+let lastAccepted = null;      // last accepted code (to avoid instant re-adds)
+let lastAcceptedAt = 0;
+let passCount = 0;
+
+async function startScanLoop(){
+  scanning = true;
+  lastRead = null; lastAccepted = null; passCount = 0;
+  try{
+    await getOcrWorker();
+  }catch(e){
+    scannerMsg.textContent = e.message;
+    return;
+  }
+  scannerMsg.textContent = 'Scanning — hold the code steady in the box…';
+  scanLoop();
+}
+
+async function scanLoop(){
+  while(scanning){
+    if(!scanVideo.videoWidth){ await sleep(200); continue; }
+    const canvas = grabGuideRegion(passCount % 2 === 1); // alternate preprocessing
+    passCount++;
+    let code = null;
+    try{
+      const {data} = await ocrWorker.recognize(canvas);
+      code = matchOcrText(data.text);
+    }catch(e){ /* keep looping */ }
+    if(!scanning) break;
+
+    if(code){
+      const now = Date.now();
+      if(code === lastAccepted && now - lastAcceptedAt < 4000){
+        // same sticker still in front of the camera — ignore
+      }else if(code === lastRead){
+        // seen twice in a row -> accept
+        acceptScan(code);
+        lastAccepted = code; lastAcceptedAt = now; lastRead = null;
+      }else{
+        lastRead = code;
+        scannerMsg.textContent = `Seeing ${code} — hold still to confirm…`;
+      }
+    }else{
+      lastRead = null;
+    }
+    await sleep(150);
+  }
+}
+
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+function acceptScan(code){
+  const info = codeInfo(code);
+  const already = owned.has(code);
+  if(!already){
+    owned.add(code);
+    saveOwned();
+    render(document.getElementById('searchInput').value);
+  }
+  if(navigator.vibrate) navigator.vibrate(already ? [60,60,60] : 120);
+  scannerMsg.textContent = already
+    ? `📎 ${code} — already have it (spare for swapping). Next sticker…`
+    : `✓ ${code} — ${info.group.name}, ${info.sticker.label}. Next sticker…`;
+}
+
+function stopScanLoop(){ scanning = false; }
+
 function closeScanner(){
+  stopScanLoop();
   scanner.classList.remove('show');
   if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream = null; }
   scanVideo.srcObject = null;
 }
 document.getElementById('closeScanBtn').addEventListener('click', closeScanner);
 
-function grabGuideRegion(){
+function grabGuideRegion(binarize){
   const vw = scanVideo.videoWidth, vh = scanVideo.videoHeight;
   if(!vw || !vh) return null;
   // The guide box: centred horizontally, at 42% height, 72% of the *displayed* width, 4:1 aspect.
@@ -632,23 +696,30 @@ function grabGuideRegion(){
   const gX = offX + (visW - gW)/2;
   const gY = offY + visH*0.42 - gH/2;
 
-  // Crop, upscale 2x, grayscale + contrast stretch for better OCR
-  const outW = Math.round(gW*2), outH = Math.round(gH*2);
+  // Crop, upscale 3x, grayscale; alternate passes apply hard binarization,
+  // which handles glossy/low-contrast print differently than contrast stretch
+  const outW = Math.round(gW*3), outH = Math.round(gH*3);
   const canvas = document.createElement('canvas');
   canvas.width = outW; canvas.height = outH;
   const ctx = canvas.getContext('2d');
   ctx.drawImage(scanVideo, gX, gY, gW, gH, 0, 0, outW, outH);
   const img = ctx.getImageData(0,0,outW,outH);
   const d = img.data;
-  let min=255, max=0;
+  let min=255, max=0, sum=0;
   for(let i=0;i<d.length;i+=4){
     const g = 0.299*d[i]+0.587*d[i+1]+0.114*d[i+2];
-    if(g<min)min=g; if(g>max)max=g;
+    if(g<min)min=g; if(g>max)max=g; sum+=g;
     d[i]=d[i+1]=d[i+2]=g;
   }
   const range = Math.max(1, max-min);
+  const mean = sum/(d.length/4);
   for(let i=0;i<d.length;i+=4){
-    const v = Math.max(0, Math.min(255, (d[i]-min)*255/range));
+    let v;
+    if(binarize){
+      v = d[i] < mean ? 0 : 255;               // hard threshold at the mean
+    }else{
+      v = Math.max(0, Math.min(255, (d[i]-min)*255/range)); // contrast stretch
+    }
     d[i]=d[i+1]=d[i+2]=v;
   }
   ctx.putImageData(img,0,0);
@@ -689,28 +760,6 @@ function matchOcrText(text){
   return null;
 }
 
-captureBtn.addEventListener('click', async ()=>{
-  captureBtn.disabled = true;
-  captureBtn.textContent = 'Reading…';
-  scannerMsg.textContent = '';
-  try{
-    const canvas = grabGuideRegion();
-    if(!canvas) throw new Error('Camera not ready yet — give it a second.');
-    const worker = await getOcrWorker();
-    const {data} = await worker.recognize(canvas);
-    const code = matchOcrText(data.text);
-    if(code){
-      closeScanner();
-      handleEnteredCode(code);
-    }else{
-      scannerMsg.textContent = `Read "${(data.text||'').trim().slice(0,25) || 'nothing'}" — not a code I know. Get closer, keep it level, and try again.`;
-    }
-  }catch(e){
-    scannerMsg.textContent = e.message || 'Couldn\'t read that — try again.';
-  }
-  captureBtn.disabled = false;
-  captureBtn.textContent = 'Read code';
-});
 
 loadOwned();
 </script>
